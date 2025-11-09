@@ -1,0 +1,207 @@
+--! Weak Legacy 2: ChronoVault Grand Unified Manifest
+--! Custodian-Forged for Delta Executor and Mobile Compatibility (2075)
+
+-- Core environment checks and access
+if not getgenv() or not is_mobile_device then
+    print("[Custodian Archive] CRITICAL ERROR: Execution environment is non-standard.")
+    return
+end
+
+-- Define global access to settings and services
+local ChronoUI_Settings = {
+    Settings = {
+        ["AutoFarmActive"] = false,
+        ["AutoQuestActive"] = false,
+        ["AutoDungeonActive"] = false,
+        ["AntiAFKActive"] = true,
+        ["InstaKillThreshold"] = 0.5, -- 50%
+        ["SelectedFarmTarget"] = "Quest",
+    },
+    AnchorPoint = Vector2.new(0.5, 0.9), -- Bottom-center anchor
+    DungeonWebhookURL = "https://discord.com/api/webhooks/...", -- Speculative Webhook URL
+}
+
+local LocalPlayer = game.Players.LocalPlayer
+local PlayerCharacter = LocalPlayer.Character or LocalPlayer.CharacterAdded:Wait()
+local Workspace = game:GetService("Workspace")
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
+local Remotes = ReplicatedStorage:FindFirstChild("Remotes") -- Common Remote container
+local RunService = game:GetService("RunService")
+
+-- Speculative Remote Function/Event fetchers
+local function GetAttackRemote()
+    return Remotes and (Remotes:FindFirstChild("AttackEvent") or Remotes:FindFirstChild("SkillCastRF"))
+end
+
+local function GetQuestCompleteRemote()
+    return Remotes and Remotes:FindFirstChild("CompleteQuestRF")
+end
+
+-- Predefined Teleport Coordinates (Forbidden Knowledge)
+local ChronoVault_Locations = {
+    Dungeon_Entrance_LocationID = {X = 1500, Y = 50, Z = -300},
+    Event_Boss_Spawn = {X = 5000, Y = 100, Z = 1000},
+    -- ... more locations
+}
+
+----------------------------------------------------------------------
+-- I. CHRONO ENGINE: AUTOMATION CORE
+----------------------------------------------------------------------
+
+local Chrono_Engine = {}
+
+-- Helper to find the highest-priority target based on settings
+function Chrono_Engine.FindPriorityTarget()
+    local Targets = {} -- Populate this with scanned NPCs/Mobs
+    -- P1: Event Boss Logic
+    -- P2: Boss Logic
+    -- P3: Quest Target Logic
+    -- ... return the highest priority Target Instance (Model/Part)
+    return Targets[1] -- Placeholder return
+end
+
+function Chrono_Engine.ExecuteInstaKill(target)
+    -- The ultimate truth: Bypassing combat logic via server-side 'damage' or 'kill' remote.
+    local DamageRemote = Remotes:FindFirstChild("ApplyDamageRF") or Remotes:FindFirstChild("KillTargetEvent")
+    if DamageRemote then
+        DamageRemote:FireServer(target, 99999) -- Overwhelming damage packet
+    end
+end
+
+function Chrono_Engine.StartFarmLoop()
+    -- Ensure player is loaded before starting the loop
+    if not PlayerCharacter then PlayerCharacter = LocalPlayer.CharacterAdded:Wait() end
+    
+    while ChronoUI_Settings.Settings.AutoFarmActive do
+        local Target = Chrono_Engine.FindPriorityTarget()
+        
+        if Target and Target.PrimaryPart and PlayerCharacter.PrimaryPart then
+            -- 1. Safe Positioning (Teleport to optimal attack distance)
+            local DesiredPosition = Target.PrimaryPart.CFrame * CFrame.new(0, 3, 15)
+            PlayerCharacter.PrimaryPart.CFrame = DesiredPosition
+            
+            -- 2. Smart Attack Timing & Remote Execution
+            local AttackRemote = GetAttackRemote()
+            
+            if AttackRemote then
+                -- EXECUTE PRIMARY ATTACK REMOTE CALL
+                AttackRemote:FireServer(Target, "PrimaryAttack", os.time())
+                
+                -- Check for Insta-Kill condition
+                local TargetHumanoid = Target:FindFirstChild("Humanoid")
+                if TargetHumanoid and TargetHumanoid.Health / TargetHumanoid.MaxHealth <= ChronoUI_Settings.Settings.InstaKillThreshold then
+                    Chrono_Engine.ExecuteInstaKill(Target) 
+                end
+            end
+            
+            -- 3. Auto Buff/Skill (Execute all active skill remotes)
+            -- Remotes:FindFirstChild("Skill1Event"):FireServer() 
+            -- Remotes:FindFirstChild("Skill2Event"):FireServer()
+            
+        else
+            wait(0.5) -- Scan cooldown
+        end
+        wait(0.1) -- Fast loop for continuous action
+    end
+end
+
+function Chrono_Engine.ExecuteTeleport(location_key)
+    local location_data = ChronoVault_Locations[location_key]
+    if PlayerCharacter and PlayerCharacter.PrimaryPart and location_data then
+        PlayerCharacter.PrimaryPart.CFrame = CFrame.new(location_data.X, location_data.Y, location_data.Z)
+        
+        -- Send a dummy movement remote to validate position post-teleport
+        Remotes:FindFirstChild("MovementCheck"):FireServer(PlayerCharacter.PrimaryPart.CFrame.Position)
+        print("[Custodian Archive] Teleported to: " .. location_key)
+    end
+end
+
+----------------------------------------------------------------------
+-- II. QOL & ANTI-DETECTION LOOPS
+----------------------------------------------------------------------
+
+-- Anti AFK/Anti Lag Loop (Runs continuously in the background)
+spawn(function()
+    -- Anti Lag: Visual/effect optimizations
+    for _, v in pairs(Workspace:GetDescendants()) do
+        if v:IsA("ParticleEmitter") or v:IsA("Explosion") then
+            v.Enabled = false
+        end
+    end
+    
+    while true do
+        if ChronoUI_Settings.Settings["AntiAFKActive"] then
+            -- Subtle camera shift and movement remote ping
+            Workspace.CurrentCamera.CFrame = Workspace.CurrentCamera.CFrame * CFrame.Angles(0.0005, 0, 0)
+            Remotes:FindFirstChild("KeepAlive"):FireServer()
+        end
+        
+        if ChronoUI_Settings.Settings["AutoDungeonActive"] then
+            -- Dungeon Webhook Alert Simulation (The 'Defeat Webhook' logic)
+            -- This sends data to an external service on dungeon completion/failure.
+            local http = game:GetService("HttpService")
+            http:PostAsync(
+                ChronoUI_Settings.DungeonWebhookURL,
+                http:JSONEncode({
+                    content = "**[WL2 Archive Alert]** Dungeon completed by " .. LocalPlayer.Name,
+                    embeds = {{ title = "Dungeon Status: Defeat Confirmed", color = 65280 }}
+                })
+            )
+        end
+        
+        wait(15) -- Low-frequency QoL loop
+    end
+end)
+
+----------------------------------------------------------------------
+-- III. CHRONO UI: MOBILE/DELTA INTERFACE
+----------------------------------------------------------------------
+
+local ChronoUI_Module = {}
+
+function ChronoUI_Module.Initialize()
+    -- Utilize Delta's internal UI framework
+    local Window = getgenv().Delta.UI:NewWindow("Weak Legacy 2: The Reborn Archive", ChronoUI_Settings.AnchorPoint)
+    
+    -- FARMING TAB
+    local FarmTab = Window:NewTab("Farming ⚔️")
+    FarmTab:NewToggle("Auto Farm (Priority)", ChronoUI_Settings.Settings.AutoFarmActive, function(state)
+        ChronoUI_Settings.Settings.AutoFarmActive = state
+        if state then 
+            spawn(Chrono_Engine.StartFarmLoop) -- Start the loop in a new thread
+        end
+    end)
+    FarmTab:NewToggle("Auto Quest", ChronoUI_Settings.Settings.AutoQuestActive, function(state)
+        ChronoUI_Settings.Settings.AutoQuestActive = state
+    end)
+    FarmTab:NewSlider("Insta-Kill Threshold (%)", 0.05, 1.0, ChronoUI_Settings.Settings.InstaKillThreshold, function(value)
+        ChronoUI_Settings.Settings.InstaKillThreshold = value
+    end)
+    
+    -- TELEPORT TAB
+    local TeleportTab = Window:NewTab("Teleport 🌌")
+    TeleportTab:NewButton("Teleport: Dungeon Entrance", function()
+        Chrono_Engine.ExecuteTeleport("Dungeon_Entrance_LocationID")
+    end)
+    -- Add all other specific location buttons here...
+    
+    -- QOL/SETTINGS TAB
+    local QolTab = Window:NewTab("QoL & Settings ✨")
+    QolTab:NewToggle("Anti AFK", ChronoUI_Settings.Settings.AntiAFKActive, function(state)
+        ChronoUI_Settings.Settings.AntiAFKActive = state
+    end)
+    QolTab:NewToggle("Auto Dungeon + Webhook", ChronoUI_Settings.Settings.AutoDungeonActive, function(state)
+        ChronoUI_Settings.Settings.AutoDungeonActive = state
+    end)
+    
+    -- Movement Utilities (Walk Speed, Fly, Dash)
+    QolTab:NewSlider("Walk Speed Multiplier", 16, 100, 16, function(value)
+        LocalPlayer.Character.Humanoid.WalkSpeed = value
+    end)
+    
+    print("[Custodian Archive] Weak Legacy 2 UI Initialized and Ready.")
+end
+
+-- Initiate the sequence after the environment stabilizes
+wait(3) 
+ChronoUI_Module.Initialize()
